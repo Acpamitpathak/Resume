@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Resume</title>
+  <link rel="stylesheet" href="styles.css">
+  <!-- Font Awesome for Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+  <header>
+    <h1>Amit Chandra Pathak</h1>
+        <!-- Contact Info -->
+  <div class="contact-info">
+    <p><i class="fas fa-phone"></i> +91 9823022897 | <i class="   fas fa-envelope"></i>  amitchandrapathak.0807@gmail.com </p>
+  </div>
+    <nav>
+      <ul>
+        <li><a href="#resume">Resume</a></li>
+        <li><a href="#organizations">Organizations</a></li>
+        <li><a href="#contact">Contact</a></li>
+
+      </ul>
+    </nav>
+  </header>
+
+  <section id="organizations" class="tab-content">
+    <h2>Organizations</h2>
+    <div class="timeline">
+      <!-- UBS Business Solutions -->
+      <div class="timeline-card">
+        <div class="timeline-icon">
+          <i class="fas fa-building"></i>
+        </div>
+        <div class="timeline-content">
+          <h3>UBS Business Solutions (India) Private Limited</h3>
+          <p class="timeline-date">Pune, Jul 2024 - Present</p>
+          <p class="timeline-domain"><i class="fas fa-landmark"></i> Domain: Banking</p>
+        </div>
+      </div>
+  
+      <!-- Siemens Digital Industries -->
+      <div class="timeline-card">
+        <div class="timeline-icon">
+          <i class="fas fa-industry"></i>
+        </div>
+        <div class="timeline-content">
+          <h3>Siemens Digital Industries Software India Pvt Ltd</h3>
+          <p class="timeline-date">Pune, Jul 2018 - Jul 2024</p>
+          <p class="timeline-domain"><i class="fas fa-cogs"></i> Domain: Manufacturing</p>
+        </div>
+      </div>
+  
+      <!-- UBS Business Solutions (Previous) -->
+      <div class="timeline-card">
+        <div class="timeline-icon">
+          <i class="fas fa-building"></i>
+        </div>
+        <div class="timeline-content">
+          <h3>SpringerNature (Former CREST)</h3>
+          <p class="timeline-date">Pune, Oct 2014 - Jul 2018</p>
+          <p class="timeline-domain"><i class="fas fa-book"></i> Domain: Publishing</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Resume Tab -->
+  <section id="resume" class="tab-content active">
+    <h2>Full Stack DotNet Developer | Cloud( AWS, Azure ) | Devops( Docker|Kubernetes) | Leadership | Mentor </h2>
+    <p>Here is my resume content. You can add your education, experience, skills, etc.</p>
+    <!-- Add your resume details here -->
+  </section>
+
+  <!-- Contact Tab -->
+  <section id="contact" class="tab-content">
+    <h2>Contact Me</h2>
+
+    <!-- Email Section -->
+    <div class="contact-section">
+      <h3>Send me an Email</h3>
+    <p>Email:</p>
+      <form id="contact-form" action="https://formspree.io/f/mkgjgovb" method="POST">
+        <label for="name">Name:</label>
+        <input type="text" id="name" name="name" required>
+
+        <label for="email">Your Email:</label>
+        <input type="email" id="email" name="email" required>
+
+        <label for="message">Message:</label>
+        <textarea id="message" name="message" rows="5" required></textarea>
+
+        <button type="submit">Send Message</button>
+      </form>
+      <p id="form-status"></p>
+    </div>
+
+    <!-- WhatsApp & SMS Section -->
+    <div class="contact-section">
+      <h3>Message me directly</h3>
+      <p>
+        <a href="https://wa.me/919823022897?text=Hi%20there%2C%20I%20found%20your%20resume%20online%20and%20wanted%20to%20connect." target="_blank" class="whatsapp-button">
+          <i class="fab fa-whatsapp"></i> Send me a message on WhatsApp
+        </a>
+      </p>
+      <p>
+        <a href="sms:+919823022897?body=Hi%20there%2C%20I%20found%20your%20resume%20online%20and%20wanted%20to%20connect." target="_blank" class="sms-button">
+          <i class="fas fa-comment-alt"></i> Send me an SMS
+        </a>
+      </p>
+    </div>
+  </section>
+
+  <script src="script.js"></script>
+</body>
+</html>
