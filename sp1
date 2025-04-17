@@ -1,0 +1,63 @@
+CREATE PROCEDURE Sync_Stage_To_Employee
+    @ImportID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @BatchSize INT = 2000;
+    DECLARE @LastMaxID INT = 0;
+    DECLARE @MaxStageID INT;
+
+    BEGIN TRY
+        SELECT @MaxStageID = MAX(stage_worker_id) 
+        FROM stage 
+        WHERE import = @ImportID;
+
+        WHILE @LastMaxID < @MaxStageID
+        BEGIN
+            -------------------------
+            -- INSERT new records
+            -------------------------
+            INSERT INTO employee (emp_worker_id, emp_name, emp_salary, Status)
+            SELECT s.stage_worker_id, s.stage_name, s.stage_salary, 'Active'
+            FROM stage s
+            LEFT JOIN employee e ON e.emp_worker_id = s.stage_worker_id
+            WHERE s.import = @ImportID
+              AND s.stage_worker_id > @LastMaxID
+              AND s.stage_worker_id <= @LastMaxID + @BatchSize
+              AND e.emp_worker_id IS NULL;
+
+            -------------------------
+            -- UPDATE existing records
+            -------------------------
+            UPDATE e
+            SET 
+                emp_name = s.stage_name,
+                emp_salary = s.stage_salary
+            FROM employee e
+            INNER JOIN stage s ON s.stage_worker_id = e.emp_worker_id
+            WHERE s.import = @ImportID
+              AND s.stage_worker_id > @LastMaxID
+              AND s.stage_worker_id <= @LastMaxID + @BatchSize
+              AND (
+                  ISNULL(e.emp_name, '') <> ISNULL(s.stage_name, '') OR
+                  ISNULL(e.emp_salary, 0) <> ISNULL(s.stage_salary, 0)
+              );
+
+            SET @LastMaxID = @LastMaxID + @BatchSize;
+        END
+
+        -------------------------
+        -- TERMINATE employees not in stage
+        -------------------------
+        UPDATE e
+        SET Status = 'Terminated'
+        FROM employee e
+        LEFT JOIN stage s ON s.stage_worker_id = e.emp_worker_id AND s.import = @ImportID
+        WHERE s.stage_worker_id IS NULL AND e.Status <> 'Terminated';
+
+    END TRY
+    BEGIN CATCH
+        PRINT 'Error Occurred: ' + ERROR_MESSAGE();
+    END CATCH
+END
