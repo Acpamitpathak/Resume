@@ -20,6 +20,8 @@ BEGIN
         FROM employee e
         INNER JOIN stage s ON e.worker_id = s.worker_id;
 
+        PRINT 'Deleted records from employee table where worker_id matched with stage: ' + CAST(@@ROWCOUNT AS NVARCHAR);
+
         -- Loop through stage data in batches
         WHILE @MinWorkerID IS NOT NULL AND @MinWorkerID <= @MaxWorkerID
         BEGIN
@@ -43,6 +45,11 @@ BEGIN
             WHERE 
                 TRY_CAST(s.worker_id AS BIGINT) BETWEEN @MinWorkerID AND (@MinWorkerID + @BatchSize - 1);
 
+            PRINT 'Inserted records into employee table from stage for worker_id range: ' 
+                + CAST(@MinWorkerID AS NVARCHAR) 
+                + ' to ' + CAST(@MinWorkerID + @BatchSize - 1 AS NVARCHAR)
+                + '. Rows inserted: ' + CAST(@@ROWCOUNT AS NVARCHAR);
+
             -- Move to next batch
             SET @MinWorkerID = @MinWorkerID + @BatchSize;
         END
@@ -56,6 +63,8 @@ BEGIN
         LEFT JOIN stage s ON e.worker_id = s.worker_id
         WHERE s.worker_id IS NULL
           AND e.Status <> 'Terminated';
+
+        PRINT 'Terminated employees who are not present in stage. Rows updated: ' + CAST(@@ROWCOUNT AS NVARCHAR);
 
     END TRY
     BEGIN CATCH
