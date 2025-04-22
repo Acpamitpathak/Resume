@@ -1,0 +1,62 @@
+CREATE PROCEDURE Sync_Stage_To_Employee
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @BatchSize INT = 2000;
+    DECLARE @MinWorkerID INT;
+    DECLARE @MaxWorkerID INT;
+
+    BEGIN TRY
+        -- Get min and max stage_worker_id
+        SELECT @MinWorkerID = MIN(worker_id), @MaxWorkerID = MAX(worker_id) FROM stage;
+
+        WHILE @MinWorkerID IS NOT NULL AND @MinWorkerID <= @MaxWorkerID
+        BEGIN
+            -------------------------
+            -- Delete existing matching records from employee (to be re-inserted)
+            -------------------------
+            DELETE e
+            FROM employee e
+            INNER JOIN stage s
+                ON e.worker_id = s.worker_id
+            WHERE s.worker_id BETWEEN @MinWorkerID AND @MinWorkerID + @BatchSize - 1;
+
+            -------------------------
+            -- Insert all stage records into employee (inserted or re-inserted)
+            -------------------------
+            INSERT INTO employee (
+                worker_id,
+                emp_name,
+                emp_salary,
+                -- Add all other mapped columns here...
+                Status
+            )
+            SELECT
+                s.worker_id,
+                s.stage_name,
+                s.stage_salary,
+                -- Map remaining columns here...
+                'Active'
+            FROM stage s
+            WHERE s.worker_id BETWEEN @MinWorkerID AND @MinWorkerID + @BatchSize - 1;
+
+            -------------------------
+            -- Update employees not found in stage to 'Terminated'
+            -------------------------
+            UPDATE e
+            SET Status = 'Terminated'
+            FROM employee e
+            LEFT JOIN stage s ON s.worker_id = e.worker_id
+            WHERE s.worker_id IS NULL
+              AND e.Status <> 'Terminated';
+
+            -- Move to next batch
+            SET @MinWorkerID = @MinWorkerID + @BatchSize;
+        END
+    END TRY
+    BEGIN CATCH
+        PRINT 'Error Occurred: ' + ERROR_MESSAGE();
+        -- Optional: Log error to a logging table
+    END CATCH
+END
