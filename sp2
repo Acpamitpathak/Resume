@@ -4,32 +4,38 @@ BEGIN
     SET NOCOUNT ON;
 
     DECLARE @BatchSize INT = 2000;
-    DECLARE @MinWorkerID INT;
-    DECLARE @MaxWorkerID INT;
+    DECLARE @MinWorkerID BIGINT;
+    DECLARE @MaxWorkerID BIGINT;
 
     BEGIN TRY
-        -- Get min and max stage_worker_id
-        SELECT @MinWorkerID = MIN(worker_id), @MaxWorkerID = MAX(worker_id) FROM stage;
+        -- Get min and max numeric worker_id values (safely casting from NVARCHAR)
+        SELECT 
+            @MinWorkerID = MIN(TRY_CAST(worker_id AS BIGINT)),
+            @MaxWorkerID = MAX(TRY_CAST(worker_id AS BIGINT))
+        FROM stage
+        WHERE TRY_CAST(worker_id AS BIGINT) IS NOT NULL;
 
+        -- Loop through in batches
         WHILE @MinWorkerID IS NOT NULL AND @MinWorkerID <= @MaxWorkerID
         BEGIN
             -------------------------
-            -- Delete existing matching records from employee (to be re-inserted)
+            -- Delete existing employee records for this batch (to re-insert)
             -------------------------
             DELETE e
             FROM employee e
             INNER JOIN stage s
                 ON e.worker_id = s.worker_id
-            WHERE s.worker_id BETWEEN @MinWorkerID AND @MinWorkerID + @BatchSize - 1;
+            WHERE 
+                TRY_CAST(s.worker_id AS BIGINT) BETWEEN @MinWorkerID AND (@MinWorkerID + @BatchSize - 1);
 
             -------------------------
-            -- Insert all stage records into employee (inserted or re-inserted)
+            -- Insert stage records into employee table
             -------------------------
             INSERT INTO employee (
                 worker_id,
                 emp_name,
                 emp_salary,
-                -- Add all other mapped columns here...
+                -- Add other mapped columns here...
                 Status
             )
             SELECT
@@ -39,15 +45,17 @@ BEGIN
                 -- Map remaining columns here...
                 'Active'
             FROM stage s
-            WHERE s.worker_id BETWEEN @MinWorkerID AND @MinWorkerID + @BatchSize - 1;
+            WHERE 
+                TRY_CAST(s.worker_id AS BIGINT) BETWEEN @MinWorkerID AND (@MinWorkerID + @BatchSize - 1);
 
             -------------------------
-            -- Update employees not found in stage to 'Terminated'
+            -- Mark employees not found in stage as 'Terminated'
             -------------------------
             UPDATE e
             SET Status = 'Terminated'
             FROM employee e
-            LEFT JOIN stage s ON s.worker_id = e.worker_id
+            LEFT JOIN stage s 
+                ON s.worker_id = e.worker_id
             WHERE s.worker_id IS NULL
               AND e.Status <> 'Terminated';
 
@@ -57,6 +65,6 @@ BEGIN
     END TRY
     BEGIN CATCH
         PRINT 'Error Occurred: ' + ERROR_MESSAGE();
-        -- Optional: Log error to a logging table
+        -- Optional: log to error log table here
     END CATCH
-END
+END;
