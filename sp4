@@ -1,0 +1,56 @@
+CREATE PROCEDURE Sync_Stage_To_Employee
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    BEGIN TRY
+        -- Delete existing matching records (bulk delete)
+        DELETE e
+        FROM employee e
+        INNER JOIN stage s ON e.worker_id = s.worker_id;
+
+        PRINT 'Deleted records from employee table where worker_id matched with stage: ' + CAST(@@ROWCOUNT AS NVARCHAR);
+
+        -------------------------
+        -- Bulk Insert new records into employee
+        -------------------------
+        INSERT INTO employee (
+            worker_id,
+            emp_name,
+            emp_salary,
+            -- Add all other mapped columns
+            Status
+        )
+        SELECT
+            s.worker_id,
+            s.stage_name,
+            s.stage_salary,
+            -- Map other columns as needed
+            'Active'
+        FROM stage s
+        WHERE TRY_CAST(s.worker_id AS BIGINT) NOT IN (
+            SELECT worker_id FROM employee
+        );
+
+        PRINT 'Bulk Inserted new records into employee table from stage. Rows inserted: ' + CAST(@@ROWCOUNT AS NVARCHAR);
+
+        -------------------------
+        -- Mark terminated employees
+        -------------------------
+        UPDATE e
+        SET Status = 'Terminated'
+        FROM employee e
+        LEFT JOIN stage s ON e.worker_id = s.worker_id
+        WHERE s.worker_id IS NULL
+          AND e.Status <> 'Terminated';
+
+        PRINT 'Terminated employees who are not present in stage. Rows updated: ' + CAST(@@ROWCOUNT AS NVARCHAR);
+
+    END TRY
+    BEGIN CATCH
+        PRINT 'Error Occurred: ' + ERROR_MESSAGE();
+
+        -- Optional: log to error table
+        -- INSERT INTO SyncLog(ErrorMessage, ErrorDate) VALUES (ERROR_MESSAGE(), GETDATE());
+    END CATCH
+END
