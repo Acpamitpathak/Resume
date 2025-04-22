@@ -1,29 +1,88 @@
-# Define package source and project source
-$packageSource = "https://your-package-source-url"  # Replace with your package source URL
-$projectDirectory = "C:\path\to\your\project"        # Replace with your directory path containing the .csproj file
+CREATE PROCEDURE Sync_Stage_To_Employee
+AS
+BEGIN
+    SET NOCOUNT ON;
 
-# Step 1: Perform dotnet restore from a specific package source
-Write-Host "Restoring NuGet packages from package source: $packageSource"
-dotnet restore --source $packageSource $projectDirectory
+    -- Step 1: Drop and recreate the temp log table
+    IF OBJECT_ID('tempdb..#LogTable') IS NOT NULL
+    BEGIN
+        DROP TABLE #LogTable;
+    END
 
-# Step 2: Clean, build, and run the project
-Write-Host "Cleaning and building the project..."
+    CREATE TABLE #LogTable (
+        LogID INT IDENTITY(1,1) PRIMARY KEY,
+        LogDateTime DATETIME,
+        LogMessage NVARCHAR(MAX)
+    );
 
-# Find the .csproj file in the project directory (and subdirectories, if applicable)
-$csprojFile = Get-ChildItem -Path $projectDirectory -Recurse -Filter *.csproj | Select-Object -First 1
+    BEGIN TRY
+        BEGIN TRANSACTION;
 
-# Check if a .csproj file was found
-if ($csprojFile) {
-    Write-Host "Found .csproj file: $($csprojFile.FullName)"
-    
-    # Clean the project
-    dotnet clean $csprojFile.FullName
+        INSERT INTO #LogTable (LogDateTime, LogMessage)
+        VALUES (GETDATE(), 'Starting Sync_Stage_To_Employee procedure...');
 
-    # Build the project
-    dotnet build $csprojFile.FullName
+        -------------------------
+        -- Delete existing matching records (bulk delete)
+        -------------------------
+        DELETE e
+        FROM employee e
+        INNER JOIN stage s ON e.worker_id = s.worker_id;
 
-    # Run the project
-    dotnet run --project $csprojFile.FullName
-} else {
-    Write-Host "No .csproj file found in the directory: $projectDirectory"
-}
+        INSERT INTO #LogTable (LogDateTime, LogMessage)
+        VALUES (GETDATE(), 'Deleted matching records from employee. Rows: ' + CAST(@@ROWCOUNT AS NVARCHAR));
+
+        -------------------------
+        -- Bulk Insert new records into employee
+        -------------------------
+        INSERT INTO employee (
+            worker_id,
+            emp_name,
+            emp_salary,
+            Status
+        )
+        SELECT
+            s.worker_id,
+            s.stage_name,
+            s.stage_salary,
+            'Active'
+        FROM stage s
+        WHERE TRY_CAST(s.worker_id AS BIGINT) NOT IN (
+            SELECT worker_id FROM employee
+        );
+
+        INSERT INTO #LogTable (LogDateTime, LogMessage)
+        VALUES (GETDATE(), 'Inserted new records into employee. Rows: ' + CAST(@@ROWCOUNT AS NVARCHAR));
+
+        -------------------------
+        -- Mark terminated employees
+        -------------------------
+        UPDATE e
+        SET Status = 'Terminated'
+        FROM employee e
+        LEFT JOIN stage s ON s.worker_id = e.worker_id
+        WHERE s.worker_id IS NULL
+          AND e.Status <> 'Terminated';
+
+        INSERT INTO #LogTable (LogDateTime, LogMessage)
+        VALUES (GETDATE(), 'Marked employees as Terminated. Rows: ' + CAST(@@ROWCOUNT AS NVARCHAR));
+
+        COMMIT;
+
+        INSERT INTO #LogTable (LogDateTime, LogMessage)
+        VALUES (GETDATE(), 'Transaction committed successfully.');
+    END TRY
+    BEGIN CATCH
+        -- Log the error before rollback
+        INSERT INTO #LogTable (LogDateTime, LogMessage)
+        VALUES (GETDATE(), 'Error occurred: ' + ERROR_MESSAGE());
+
+        IF XACT_STATE() <> 0
+            ROLLBACK;
+
+        -- Optionally return the error to caller
+        RAISERROR('Transaction rolled back due to error: %s', 16, 1, ERROR_MESSAGE());
+    END CATCH
+
+    -- Final log output (optional: you can select from this temp table)
+    SELECT * FROM #LogTable;
+END
