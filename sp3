@@ -1,0 +1,67 @@
+CREATE PROCEDURE Sync_Stage_To_Employee
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @BatchSize INT = 2000;
+    DECLARE @MinWorkerID BIGINT;
+    DECLARE @MaxWorkerID BIGINT;
+
+    BEGIN TRY
+        -- Get min and max numeric worker_id values (safely)
+        SELECT 
+            @MinWorkerID = MIN(TRY_CAST(worker_id AS BIGINT)),
+            @MaxWorkerID = MAX(TRY_CAST(worker_id AS BIGINT))
+        FROM stage
+        WHERE TRY_CAST(worker_id AS BIGINT) IS NOT NULL;
+
+        -- Optional: Delete existing matching records (bulk delete)
+        DELETE e
+        FROM employee e
+        INNER JOIN stage s ON e.worker_id = s.worker_id;
+
+        -- Loop through stage data in batches
+        WHILE @MinWorkerID IS NOT NULL AND @MinWorkerID <= @MaxWorkerID
+        BEGIN
+            -------------------------
+            -- Insert new or updated records
+            -------------------------
+            INSERT INTO employee (
+                worker_id,
+                emp_name,
+                emp_salary,
+                -- Add all other mapped columns
+                Status
+            )
+            SELECT
+                s.worker_id,
+                s.stage_name,
+                s.stage_salary,
+                -- Map other columns as needed
+                'Active'
+            FROM stage s
+            WHERE 
+                TRY_CAST(s.worker_id AS BIGINT) BETWEEN @MinWorkerID AND (@MinWorkerID + @BatchSize - 1);
+
+            -- Move to next batch
+            SET @MinWorkerID = @MinWorkerID + @BatchSize;
+        END
+
+        -------------------------
+        -- Mark terminated employees
+        -------------------------
+        UPDATE e
+        SET Status = 'Terminated'
+        FROM employee e
+        LEFT JOIN stage s ON e.worker_id = s.worker_id
+        WHERE s.worker_id IS NULL
+          AND e.Status <> 'Terminated';
+
+    END TRY
+    BEGIN CATCH
+        PRINT 'Error Occurred: ' + ERROR_MESSAGE();
+
+        -- Optional: log to error table
+        -- INSERT INTO SyncLog(ErrorMessage, ErrorDate) VALUES (ERROR_MESSAGE(), GETDATE());
+    END CATCH
+END
