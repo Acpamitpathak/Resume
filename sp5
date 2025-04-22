@@ -1,0 +1,29 @@
+# Define package source and project source
+$packageSource = "https://your-package-source-url"  # Replace with your package source URL
+$projectDirectory = "C:\path\to\your\project"        # Replace with your directory path containing the .csproj file
+
+# Step 1: Perform dotnet restore from a specific package source
+Write-Host "Restoring NuGet packages from package source: $packageSource"
+dotnet restore --source $packageSource $projectDirectory
+
+# Step 2: Clean, build, and run the project
+Write-Host "Cleaning and building the project..."
+
+# Find the .csproj file in the project directory (and subdirectories, if applicable)
+$csprojFile = Get-ChildItem -Path $projectDirectory -Recurse -Filter *.csproj | Select-Object -First 1
+
+# Check if a .csproj file was found
+if ($csprojFile) {
+    Write-Host "Found .csproj file: $($csprojFile.FullName)"
+    
+    # Clean the project
+    dotnet clean $csprojFile.FullName
+
+    # Build the project
+    dotnet build $csprojFile.FullName
+
+    # Run the project
+    dotnet run --project $csprojFile.FullName
+} else {
+    Write-Host "No .csproj file found in the directory: $projectDirectory"
+}
