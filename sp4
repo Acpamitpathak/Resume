@@ -1,3 +1,41 @@
+-- Step 1: Drop the temp log table if it exists
+IF OBJECT_ID('tempdb..#LogTable') IS NOT NULL
+BEGIN
+    DROP TABLE #LogTable;
+END
+
+-- Step 2: Create the temp log table
+CREATE TABLE #LogTable (
+    LogID INT IDENTITY(1,1) PRIMARY KEY,
+    LogDateTime DATETIME,
+    LogMessage NVARCHAR(MAX)
+);
+
+-- Step 3: Insert a log message
+INSERT INTO #LogTable (LogDateTime, LogMessage)
+VALUES (GETDATE(), 'Starting OUCode validation...');
+
+-- Step 4: Capture updated employees
+DECLARE @UpdatedEmployees TABLE (employee_id INT);
+
+UPDATE e
+SET 
+    e.OUCode = NULL,
+    e.OUValue = NULL
+OUTPUT DELETED.employee_id INTO @UpdatedEmployees(employee_id)
+FROM employee e
+LEFT JOIN cost_center c ON e.OUCode = c.OUCode
+WHERE c.OUCode IS NULL;
+
+-- Step 5: Log for each affected employee
+INSERT INTO #LogTable (LogDateTime, LogMessage)
+SELECT GETDATE(), 'OUCode cleared for Employee ID: ' + CAST(employee_id AS NVARCHAR)
+FROM @UpdatedEmployees;
+
+-- Step 6: View the logs (optional)
+SELECT * FROM #LogTable;
+
+
 CREATE PROCEDURE Sync_Stage_To_Employee
 AS
 BEGIN
